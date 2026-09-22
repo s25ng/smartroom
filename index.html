@@ -52,10 +52,45 @@ function finishFromDocs(){current.missing=[...document.querySelectorAll('.docChe
 function estimate(r){const completed=r.filter(x=>x.status==='완료'&&x.processMinutes>0);const same=completed.filter(x=>x.service===current.service);const pool=same.length?same:completed;const avg=pool.length?pool.reduce((a,x)=>a+x.processMinutes,0)/pool.length:8;const waiting=r.filter(x=>x.status!=='완료').length;return Math.max(3,Math.round(avg*(waiting+1)))}
 function createRecord(){let r=records();const now=Date.now(), est=estimate(r);const rec={id:'T'+String(now).slice(-7),createdAt:now,category:current.category||'자격',service:current.service||'피부양자 등록 (가족)',relation:current.relation||'',visit:current.visit||'본인 방문',missing:current.missing,status:'대기',estimatedMinutes:est,startAt:null,endAt:null,waitMinutes:null,processMinutes:null};r.push(rec);save(r);done(rec)}
 function done(rec){render(7,7,`<div class="complete"><div class="checkmark">✓</div><div class="title">상담 준비가<br>완료되었습니다!</div><div class="desc">TEST 접수 데이터가 저장되었습니다.</div><div class="card" style="text-align:left"><b>TEST 방문 ID</b><br>${rec.id}<br><br><b>선택 업무</b><br>${rec.service}<br><br><b>방문 유형</b><br>${rec.visit}${rec.missing.length?`<br><br><b>미비서류</b><br>${rec.missing.join(', ')}`:''}</div><div class="wait"><small>데이터 기반 예상 대기시간 · TEST</small><br><strong>약 ${rec.estimatedMinutes}분</strong></div><button class="btn primary" onclick="home()">새 TEST 접수</button></div>`)}
-function toggleMode(){if(MB.textContent==='관리자모드') admin(); else {MB.textContent='관리자모드';home()}}
+function toggleMode(){
+  if(MB.textContent==='관리자모드') adminLogin();
+  else logoutAdmin();
+}
+function adminLogin(){
+  SW.style.display='none';
+  MB.textContent='고객모드';
+  A.innerHTML=`<div class="eyebrow">TEST 관리자 인증</div>
+  <div class="title">관리자모드<br>로그인</div>
+  <div class="desc">관리자 비밀번호를 입력해 주세요.</div>
+  <div class="card">
+    <input id="adminPw" type="password" inputmode="numeric" maxlength="4"
+      placeholder="비밀번호 4자리"
+      style="width:100%;font-size:22px;padding:15px;border:1px solid var(--line);border-radius:12px;text-align:center;letter-spacing:8px">
+    <div id="loginMsg" style="color:var(--red);font-size:13px;margin-top:10px;min-height:20px"></div>
+  </div>
+  <button class="btn primary" onclick="checkAdminPw()">로그인</button>
+  <button class="btn ghost" style="margin-top:10px" onclick="logoutAdmin()">고객모드로 돌아가기</button>
+  <div class="notice">※ TEST용 인증입니다. 실제 운영 시에는 서버 기반 인증으로 교체해야 합니다.</div>`;
+  setTimeout(()=>document.getElementById('adminPw')?.focus(),100);
+}
+function checkAdminPw(){
+  const pw=document.getElementById('adminPw').value;
+  if(pw==='1111'){
+    sessionStorage.setItem('testAdminAuth','1');
+    admin();
+  }else{
+    document.getElementById('loginMsg').textContent='비밀번호가 올바르지 않습니다.';
+    document.getElementById('adminPw').value='';
+  }
+}
+function logoutAdmin(){
+  sessionStorage.removeItem('testAdminAuth');
+  MB.textContent='관리자모드';
+  home();
+}
 function fmt(ts){return new Date(ts).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})}
 function mins(v){return v==null?'-':Math.round(v)+'분'}
-function admin(){MB.textContent='고객모드';SW.style.display='none';let r=records(), doneR=r.filter(x=>x.status==='완료'), active=r.filter(x=>x.status!=='완료');const avgWait=doneR.length?doneR.reduce((a,x)=>a+(x.waitMinutes||0),0)/doneR.length:0, avgProc=doneR.length?doneR.reduce((a,x)=>a+(x.processMinutes||0),0)/doneR.length:0;
+function admin(){if(sessionStorage.getItem('testAdminAuth')!=='1'){adminLogin();return;}MB.textContent='로그아웃';SW.style.display='none';let r=records(), doneR=r.filter(x=>x.status==='완료'), active=r.filter(x=>x.status!=='완료');const avgWait=doneR.length?doneR.reduce((a,x)=>a+(x.waitMinutes||0),0)/doneR.length:0, avgProc=doneR.length?doneR.reduce((a,x)=>a+(x.processMinutes||0),0)/doneR.length:0;
 const counts={};r.forEach(x=>counts[x.service]=(counts[x.service]||0)+1);const max=Math.max(1,...Object.values(counts));const missing={};r.forEach(x=>(x.missing||[]).forEach(d=>missing[d]=(missing[d]||0)+1));
 A.innerHTML=`<div class="eyebrow">TEST 관리자모드</div><div class="title">실적관리 대시보드</div><div class="desc">이 화면의 수치는 이 기기에서 고객모드로 생성한 TEST 기록을 실시간 집계합니다.</div>
 <div class="kpis"><div class="kpi"><small>총 접수</small><b>${r.length}건</b></div><div class="kpi"><small>현재 대기·처리</small><b>${active.length}건</b></div><div class="kpi"><small>평균 실제 대기</small><b>${mins(avgWait)}</b></div><div class="kpi"><small>평균 처리시간</small><b>${mins(avgProc)}</b></div></div>
